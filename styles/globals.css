@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  @apply bg-gray-50 text-gray-800;
+}
+
+/* Tailwind-style utilities for layout sizing (class-based) */
+@layer utilities {
+  .h-topbar { height: 4rem /* 64px */; }
+  .w-sidebar { width: 16rem /* 256px */; }
+  .mt-topbar { margin-top: 4rem; }
+  /* keep main content offset small so expanding sidebar overlays rather than pushes content */
+  .ml-sidebar { margin-left: 4rem; }
+
+  /* topbar container fixed positioning */
+  .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 50; }
+
+  /* sidebar fixed under topbar; collapsed width by default */
+  .sidebar { position: fixed; top: 4rem; left: 0; bottom: 0; z-index: 40; overflow: auto; width: 4rem; }
+
+  /* when expanded (set by JS on document element), increase visible width but do not shift main content */
+  html[data-sidebar-expanded] .sidebar { width: 16rem; }
+
+  /* collapsed sidebar: hide labels (icon-only) */
+  .sidebar .sidebar-label { display: inline }
+  html:not([data-sidebar-expanded]) .sidebar .sidebar-label { display: none; }
+
+  /* main content scrollable area */
+  .main-content { min-height: calc(100vh - 4rem); overflow: auto; }
+
+  /* sticky table header helper */
+  .table-sticky thead th { position: sticky; top: 0; background: white; z-index: 10; }
+
+  /* topbar subtle animated gradient */
+  @keyframes bg-pan { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+  .topbar-gradient {
+    background-size: 200% 200%;
+    animation: bg-pan 8s linear infinite;
+  }
+
+  /* mobile sidebar overlay transition */
+  .sidebar-overlay-enter { transform: translateX(-100%); }
+  .sidebar-overlay-enter-active { transform: translateX(0); transition: transform 200ms ease-in-out; }
+  .sidebar-overlay-exit { transform: translateX(0); }
+  .sidebar-overlay-exit-active { transform: translateX(-100%); transition: transform 200ms ease-in-out; }
+
+  /* Toast notification animation */
+  @keyframes slideIn {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  .animate-slideIn {
+    animation: slideIn 0.3s ease-out;
+  }
+}

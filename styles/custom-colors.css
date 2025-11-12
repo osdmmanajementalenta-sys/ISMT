@@ -1,0 +1,72 @@
+/* Custom Blue Color Theme - #424eed */
+
+/* Buttons dan Interactive Elements */
+.btn-primary {
+  background: linear-gradient(to right, #424eed, #5b67f7);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(to right, #3a42d4, #4e5ade);
+}
+
+/* Background Gradients */
+.bg-primary-gradient {
+  background: linear-gradient(to bottom right, #424eed, #5b67f7);
+}
+
+.bg-primary-light {
+  background: linear-gradient(to bottom right, #eef0ff, #f5f6ff);
+}
+
+/* Text Colors */
+.text-primary {
+  color: #424eed;
+}
+
+.text-primary-light {
+  color: #5b67f7;
+}
+
+/* Border Colors */
+.border-primary {
+  border-color: #424eed;
+}
+
+.border-primary-light {
+  border-color: #d4d7ff;
+}
+
+/* Ring Colors for Focus States */
+.ring-primary {
+  --tw-ring-color: #424eed;
+}
+
+.ring-primary-light {
+  --tw-ring-color: #eef0ff;
+}
+
+/* Hover States */
+.hover\:bg-primary-50:hover {
+  background-color: #eef0ff;
+}
+
+.hover\:text-primary:hover {
+  color: #424eed;
+}
+
+/* Background Colors */
+.bg-primary-50 {
+  background-color: #eef0ff;
+}
+
+.bg-primary-100 {
+  background-color: #d4d7ff;
+}
+
+.bg-primary-600 {
+  background-color: #424eed;
+}
+
+.bg-primary-700 {
+  background-color: #3a42d4;
+}
