@@ -47,6 +47,13 @@ export default function UserManagementPage() {
   const [headers, setHeaders] = useState<string[]>([])
   const [availableUserTypes, setAvailableUserTypes] = useState<string[]>(['user', 'admin', 'viewer'])
   const [loading, setLoading] = useState(true)
+  const [selectedPermissions, setSelectedPermissions] = useState<Set<number>>(new Set())
+  const [showPermissionModal, setShowPermissionModal] = useState(false)
+  const [newPermissionType, setNewPermissionType] = useState('')
+
+
+
+
 
   const showToast = (type: 'success' | 'error' | 'info' | 'warning', message: string) => {
     setToast({ type, message })
@@ -509,9 +516,10 @@ export default function UserManagementPage() {
             onClick={() => setActiveTab('users')}
             className={`px-6 py-3 font-medium transition-colors relative ${
               activeTab === 'users'
-                ? 'text-emerald-600 border-b-2 border-emerald-600'
+                ? 'border-b-2'
                 : 'text-gray-600 hover:text-gray-800'
             }`}
+            style={activeTab === 'users' ? { color: '#424eed', borderColor: '#424eed' } : {}}
           >
             Users
           </button>
@@ -519,9 +527,10 @@ export default function UserManagementPage() {
             onClick={() => setActiveTab('permissions')}
             className={`px-6 py-3 font-medium transition-colors relative ${
               activeTab === 'permissions'
-                ? 'text-emerald-600 border-b-2 border-emerald-600'
+                ? 'border-b-2'
                 : 'text-gray-600 hover:text-gray-800'
             }`}
+            style={activeTab === 'permissions' ? { color: '#424eed', borderColor: '#424eed' } : {}}
           >
             Permissions
           </button>
@@ -541,7 +550,10 @@ export default function UserManagementPage() {
                   </span>
                   <button
                     onClick={handleSaveToggleChanges}
-                    className="px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors"
+                    className="px-3 py-1.5 text-white text-sm rounded-lg transition-colors"
+                    style={{ backgroundColor: '#424eed' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3640dd'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#424eed'}
                   >
                     Save Changes
                   </button>
@@ -556,12 +568,12 @@ export default function UserManagementPage() {
               <button
                 onClick={handleAddUser}
                 disabled={isLoadingUsers}
-                className={`px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 ${hasUnsavedChanges ? '' : 'ml-auto'} ${isLoadingUsers ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 ${hasUnsavedChanges ? '' : 'ml-auto'} ${isLoadingUsers ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title="Add User"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                Add User
               </button>
             </div>
 
@@ -614,9 +626,8 @@ export default function UserManagementPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <button
                           onClick={() => handleTogglePermission(user.username, 'allowUploadFiles')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            user.allowUploadFiles ? 'bg-emerald-600' : 'bg-gray-300'
-                          }`}
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                          style={{ backgroundColor: user.allowUploadFiles ? '#424eed' : '#d1d5db' }}
                         >
                           <span
                             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -642,7 +653,8 @@ export default function UserManagementPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => handleEditUser(user)}
-                          className="text-emerald-600 hover:text-emerald-700 font-medium mr-4"
+                          className="font-medium mr-4 hover:underline"
+                          style={{ color: '#424eed' }}
                         >
                           Edit
                         </button>
@@ -666,19 +678,65 @@ export default function UserManagementPage() {
         {/* Permissions Tab */}
         {activeTab === 'permissions' && (
           <div>
-            <div className="mb-4 flex justify-end">
-              <button
-                onClick={handleSavePermissions}
-                className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-              >
-                Save Permissions
-              </button>
+            <div className="mb-4 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                {selectedPermissions.size > 0 && (
+                  <button
+                    onClick={() => {
+                      // Delete selected permissions
+                      const newData = data.filter((_, idx) => !selectedPermissions.has(idx))
+                      setData(newData)
+                      setSelectedPermissions(new Set())
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                    title="Delete Selected"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPermissionModal(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                  title="Add Permission"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleSavePermissions}
+                  className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2"
+                  title="Save Permissions"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedPermissions.size === data.length && data.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedPermissions(new Set(data.map((_, idx) => idx)))
+                          } else {
+                            setSelectedPermissions(new Set())
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
                       User Type
                     </th>
@@ -690,8 +748,24 @@ export default function UserManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {data.map((row) => (
+                  {data.map((row, idx) => (
                     <tr key={row.userType} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedPermissions.has(idx)}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedPermissions)
+                            if (e.target.checked) {
+                              newSelected.add(idx)
+                            } else {
+                              newSelected.delete(idx)
+                            }
+                            setSelectedPermissions(newSelected)
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white">
                         {row.userType}
                       </td>
@@ -701,7 +775,7 @@ export default function UserManagementPage() {
                             onClick={() => togglePermission(row.userType, h)}
                             className={`px-4 py-1.5 rounded-md font-medium transition-colors ${
                               row[h]
-                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                 : 'bg-red-100 text-red-700 hover:bg-red-200'
                             }`}
                           >
@@ -735,7 +809,7 @@ export default function UserManagementPage() {
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                     disabled={!!editingUser}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-100"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                     placeholder="Enter username"
                   />
                 </div>
@@ -746,7 +820,7 @@ export default function UserManagementPage() {
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter password"
                   />
                 </div>
@@ -757,7 +831,7 @@ export default function UserManagementPage() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter full name"
                   />
                 </div>
@@ -767,7 +841,7 @@ export default function UserManagementPage() {
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     {availableUserTypes.map((type) => (
                       <option key={type} value={type}>
@@ -786,9 +860,8 @@ export default function UserManagementPage() {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, allowUploadFiles: !formData.allowUploadFiles })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      formData.allowUploadFiles ? 'bg-emerald-600' : 'bg-gray-300'
-                    }`}
+                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                    style={{ backgroundColor: formData.allowUploadFiles ? '#424eed' : '#d1d5db' }}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -828,9 +901,70 @@ export default function UserManagementPage() {
                 </button>
                 <button
                   onClick={handleSaveUser}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                  className="px-4 py-2 text-white rounded-lg transition-colors"
+                  style={{ backgroundColor: '#424eed' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3640dd'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#424eed'}
                 >
                   {editingUser ? 'Update' : 'Add'} User
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Permission Modal */}
+        {showPermissionModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-800">Add New Permission Type</h3>
+              </div>
+
+              <div className="p-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Permission Type Name
+                </label>
+                <input
+                  type="text"
+                  value={newPermissionType}
+                  onChange={(e) => setNewPermissionType(e.target.value)}
+                  placeholder="e.g., manager, editor, viewer"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-2xl">
+                <button
+                  onClick={() => {
+                    setShowPermissionModal(false)
+                    setNewPermissionType('')
+                  }}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (newPermissionType.trim()) {
+                      // Add new permission row
+                      const newRow: PermissionData = { userType: newPermissionType.trim() }
+                      headers.forEach(header => {
+                        if (header !== 'Type') {
+                          newRow[header] = 'no'
+                        }
+                      })
+                      setData([...data, newRow])
+                      setShowPermissionModal(false)
+                      setNewPermissionType('')
+                      showToast('success', `Permission type "${newPermissionType.trim()}" added successfully`)
+                    }
+                  }}
+                  disabled={!newPermissionType.trim()}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add Permission
                 </button>
               </div>
             </div>
@@ -840,12 +974,16 @@ export default function UserManagementPage() {
         {/* Toast Notification */}
         {toast && (
           <div className="fixed bottom-4 right-4 z-50">
-            <div className={`px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 ${
-              toast.type === 'success' ? 'bg-emerald-600 text-white' :
-              toast.type === 'error' ? 'bg-red-600 text-white' :
-              toast.type === 'warning' ? 'bg-yellow-600 text-white' :
-              'bg-blue-600 text-white'
-            }`}>
+            <div 
+              className="px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 text-white"
+              style={{
+                backgroundColor: 
+                  toast.type === 'success' ? '#424eed' :
+                  toast.type === 'error' ? '#dc2626' :
+                  toast.type === 'warning' ? '#ca8a04' :
+                  '#2563eb'
+              }}
+            >
               <span>{toast.message}</span>
               <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

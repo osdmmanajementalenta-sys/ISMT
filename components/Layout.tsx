@@ -7,32 +7,65 @@ type Props = {
   children: ReactNode
 }
 
-const NAV_ITEMS = [
-  { name: 'Usul Administrator dan Pengawas', sheetName: 'Usul Administrator dan Pengawas' },
-  { name: 'Usul Plt dan Plh', sheetName: 'Usul Plt dan Plh' },
-  { name: 'Pelantikan', sheetName: 'Pelantikan' },
-  { name: 'Penugasan Luar Instansi', sheetName: 'Penugasan Luar Instansi' },
-  { name: 'Usul JPT', sheetName: 'Usul JPT' },
-  { name: 'Data Rektor', sheetName: 'Data Rektor' },
-]
-
 export default function Layout({ children }: Props) {
   // avoid reading localStorage during server render to prevent hydration mismatch
   const [user, setUser] = useState<AppUser | null>(null)
+  const [navItems, setNavItems] = useState<{ name: string; sheetName: string }[]>([])
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     setUser(getStoredUser())
+    
+    // Load navigation items from Google Spreadsheet
+    const loadNavItems = async () => {
+      try {
+        console.log('Fetching menu from /api/sheet?sheet=menu')
+        const response = await fetch('/api/sheet?sheet=menu')
+        console.log('Response status:', response.status, response.statusText)
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log('Menu data received:', data)
+          
+          if (data.rows && data.rows.length > 0) {
+            // Skip header row if exists
+            const dataRows = data.rows[0]?.[0] === 'Sheet Name' ? data.rows.slice(1) : data.rows
+            
+            // Convert rows to nav items format
+            const items = dataRows
+              .map((row: string[]) => ({
+                name: row[0] || '',
+                sheetName: row[0] || ''
+              }))
+              .filter((item: { name: string }) => item.name.trim() !== '')
+            
+            console.log('Navigation items loaded:', items)
+            setNavItems(items)
+          } else {
+            console.warn('Menu sheet is empty or has no data')
+            setNavItems([])
+          }
+        } else {
+          const errorText = await response.text()
+          console.error('Failed to load menu:', response.status, errorText)
+          setNavItems([])
+        }
+      } catch (error) {
+        console.error('Error loading navigation items:', error)
+        setNavItems([])
+      }
+    }
+    
+    loadNavItems()
   }, [])
 
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-
   // Debug: log NAV_ITEMS
-  console.log('Layout NAV_ITEMS:', NAV_ITEMS, 'length:', NAV_ITEMS.length)
+  console.log('Layout NAV_ITEMS:', navItems, 'length:', navItems.length)
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       <TopBar title="Biro Organisasi dan Sumber Daya Manusia" profileName={user?.name || user?.user} onToggle={() => setSidebarOpen((s) => !s)} />
-      <SideBar items={NAV_ITEMS} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <SideBar items={navItems} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="flex-1 p-6 overflow-hidden mt-topbar md:ml-sidebar">{children}</main>
     </div>
   )

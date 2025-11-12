@@ -63,10 +63,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // if requesting a specific sheet, check permissions via page_setting
   try {
     if (sheetName) {
-      // always allow access to the page_setting, colom_setting, and users sheets for landed users so the UI
-      // (landing page / sidebar / DataTable) can render permission cards, column settings, and user management.
+      // always allow access to the page_setting, colom_setting, users, and menu sheets for landed users so the UI
+      // (landing page / sidebar / DataTable) can render permission cards, column settings, user management, and navigation menu.
       // Restrict other sheets according to the table.
-      if (sheetName === 'page_setting' || sheetName === 'colom_setting' || sheetName === 'users') {
+      if (sheetName === 'page_setting' || sheetName === 'colom_setting' || sheetName === 'users' || sheetName === 'menu') {
         const data = await getSheetData(sheetId, sheetName)
         return res.status(200).json(data)
       }

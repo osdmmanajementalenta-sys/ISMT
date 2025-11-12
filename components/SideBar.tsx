@@ -18,6 +18,7 @@ export default function SideBar({ items, open = false, onClose }: Props) {
   const [permissions, setPermissions] = useState<PermissionMap | null>(null)
   const [loading, setLoading] = useState(true) // Start with loading true
   const [user, setUser] = useState<ReturnType<typeof getStoredUser>>(null)
+  const [menuExpanded, setMenuExpanded] = useState(true) // Menu expansion state
 
   // Debug: log items
   console.log('SideBar items:', items, 'length:', items?.length)
@@ -148,35 +149,33 @@ export default function SideBar({ items, open = false, onClose }: Props) {
                 </Link>
               </li>
 
-              {/* User Management Link - Only for Admin */}
-              {user?.type === 'admin' && (
-                <li>
-                  <Link 
-                    href="/user-management" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
-                      router.pathname === '/user-management' 
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-200/50' 
-                        : 'hover:bg-purple-50 text-gray-700 hover:text-gray-900'
-                    }`}
-                    onClick={onClose}
-                  >
-                    <div className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${
-                      router.pathname === '/user-management' 
-                        ? 'bg-white/20' 
-                        : 'bg-purple-100 group-hover:bg-purple-200'
-                    }`}>
-                      <svg className={`w-5 h-5 ${router.pathname === '/user-management' ? 'text-white' : 'text-purple-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              {/* Menu Expansion Button */}
+              <li>
+                <button
+                  onClick={() => setMenuExpanded(!menuExpanded)}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-blue-50 text-gray-700 hover:text-gray-900"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-100 transition-all">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#424eed' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                       </svg>
                     </div>
-                    <span className="text-sm font-semibold">User Management</span>
-                  </Link>
-                </li>
-              )}
+                    <span className="text-sm font-semibold">Menu</span>
+                  </div>
+                  <svg 
+                    className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${menuExpanded ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </li>
 
-
-
-              {items.map((it) => {
+              {/* Sheet Items - Collapsible */}
+              {menuExpanded && items.map((it) => {
                 const isActive = decodeURIComponent(activeSheet || '') === it.sheetName
                 
                 // Check permission based on user type and sheet name
@@ -193,7 +192,7 @@ export default function SideBar({ items, open = false, onClose }: Props) {
                 if (!allowed) return null
                 
                 return (
-                  <li key={it.sheetName}>
+                  <li key={it.sheetName} className="pl-4">
                     <Link 
                       href={`/sheet/${encodeURIComponent(it.sheetName)}`} 
                       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
@@ -308,49 +307,38 @@ export default function SideBar({ items, open = false, onClose }: Props) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
-                <span className="sidebar-label text-sm font-semibold whitespace-nowrap">Dashboard</span>
-              </Link>
-            </li>
+              <span className="sidebar-label text-sm font-semibold whitespace-nowrap">Dashboard</span>
+            </Link>
+          </li>
 
-            {/* User Management link - Only for Admin */}
-            {user?.type === 'admin' && (
-              <li>
-                <Link 
-                  href="/user-management" 
-                  className={`flex items-center gap-3 px-2 py-2.5 rounded-xl transition-all duration-200 group ${
-                    router.pathname === '/user-management' 
-                      ? 'text-white shadow-lg' 
-                      : 'hover:bg-blue-50 text-gray-700'
-                  }`}
-                  style={router.pathname === '/user-management' ? { 
-                    background: 'linear-gradient(to right, #424eed, #5b67f7)', 
-                    boxShadow: '0 4px 6px -1px rgba(66, 78, 237, 0.3)' 
-                  } : {}}
-                >
-                  <div className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-200 flex-shrink-0 ${
-                    router.pathname === '/user-management' 
-                      ? 'bg-white/20' 
-                      : 'bg-blue-100 group-hover:bg-blue-200 group-hover:scale-105'
-                  }`}>
-                    <svg className={`w-5 h-5 transition-colors ${
-                      router.pathname === '/user-management' 
-                        ? 'text-white' 
-                        : ''
-                    }`} style={router.pathname !== '/user-management' ? { color: '#424eed' } : {}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                  </div>
-                  <span className="sidebar-label text-sm font-semibold whitespace-nowrap">User Management</span>
-                </Link>
-              </li>
-            )}
+          {/* Menu Expansion Button */}
+          <li>
+            <button
+              onClick={() => setMenuExpanded(!menuExpanded)}
+              className="w-full flex items-center justify-between gap-3 px-2 py-2.5 rounded-xl transition-all duration-200 hover:bg-blue-50 text-gray-700"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-blue-100 transition-all duration-200 flex-shrink-0">
+                  <svg className="w-5 h-5" style={{ color: '#424eed' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </div>
+                <span className="sidebar-label text-sm font-semibold whitespace-nowrap">Menu</span>
+              </div>
+              <svg 
+                className={`sidebar-label w-5 h-5 text-gray-500 transition-transform duration-200 ${menuExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </li>
 
-
-
-            {items.map((it) => {
-              const isActive = decodeURIComponent(activeSheet || '') === it.sheetName
-              
-              // Check permission based on user type and sheet name
+          {/* Sheet Items - Collapsible */}
+          {menuExpanded && items.map((it) => {
+            const isActive = decodeURIComponent(activeSheet || '') === it.sheetName              // Check permission based on user type and sheet name
               const userType = user?.type || ''
               let allowed = true // Default: allow if no permissions data
               
@@ -362,7 +350,7 @@ export default function SideBar({ items, open = false, onClose }: Props) {
               if (!allowed) return null
               
               return (
-                <li key={it.sheetName}>
+                <li key={it.sheetName} className="pl-2">
                   <Link 
                     href={`/sheet/${encodeURIComponent(it.sheetName)}`} 
                     className={`flex items-center gap-3 px-2 py-2.5 rounded-xl transition-all duration-200 group ${

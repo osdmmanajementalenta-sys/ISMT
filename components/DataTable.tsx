@@ -207,6 +207,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
       
       // If column has upload and value changed, rename the folder
       if (hasUpload && oldValue && value && oldValue !== value) {
+        console.log('Attempting to rename folder:', { oldValue, value, hasUpload })
         try {
           const renameResp = await fetch('/api/folderRename', {
             method: 'POST',
@@ -217,7 +218,9 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
             }),
           })
           
+          console.log('Rename response status:', renameResp.status)
           const renameResult = await renameResp.json()
+          console.log('Rename result:', renameResult)
           
           if (renameResp.ok && renameResult.success) {
             setToast({ 
@@ -226,6 +229,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
             })
           } else {
             // Still show success for cell update but warn about folder rename
+            console.error('Folder rename failed:', renameResult)
             setToast({ 
               message: `Cell updated successfully, but folder rename failed: ${renameResult.error || 'Unknown error'}`, 
               type: 'warning' 
@@ -238,6 +242,8 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
             type: 'warning' 
           })
         }
+      } else {
+        console.log('Skipping folder rename:', { hasUpload, oldValue, value, valueChanged: oldValue !== value })
       }
       
       return true
@@ -654,7 +660,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                 type={type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
                 defaultValue={cellValue}
                 autoFocus
-                className="w-full px-2 py-1 border-2 border-emerald-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm bg-white shadow-sm"
+                className="w-full px-2 py-1 border-2 border-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white shadow-sm"
                 onBlur={async (e) => {
                   const newValue = e.target.value
                   if (newValue !== cellValue) {
@@ -692,28 +698,26 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                   {displayValue}
                 </span>
                 {(canUploadFiles || canDeleteFiles) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setUploadModal({
-                        rowIndex: row.original._rowIndex,
-                        columnId: column.id,
-                        cellValue: displayValue
-                      })
-                    }}
-                    className="flex-shrink-0 p-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm"
-                    title="Manage Files"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            )
-          }
-
-          return (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setUploadModal({
+                      rowIndex: row.original._rowIndex,
+                      columnId: column.id,
+                      cellValue: displayValue
+                    })
+                  }}
+                  className="flex-shrink-0 p-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm"
+                  title="Manage Files"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )
+        }          return (
             <div
               className={`px-2 py-1 ${isEditable ? 'cursor-pointer hover:bg-blue-50' : ''}`}
               onClick={() => {
@@ -1108,7 +1112,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
               <button
                 onClick={() => table.setPageIndex(0)}
                 disabled={!table.getCanPreviousPage()}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 transition-all text-gray-700 bg-white font-medium"
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition-all text-gray-700 bg-white font-medium"
                 title="First page"
               >
                 {'<<'}
@@ -1116,7 +1120,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
               <button
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 transition-all text-gray-700 bg-white font-medium"
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition-all text-gray-700 bg-white font-medium"
                 title="Previous page"
               >
                 {'<'}
@@ -1124,7 +1128,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
               <button
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 transition-all text-gray-700 bg-white font-medium"
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition-all text-gray-700 bg-white font-medium"
                 title="Next page"
               >
                 {'>'}
@@ -1132,7 +1136,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
               <button
                 onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                 disabled={!table.getCanNextPage()}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 transition-all text-gray-700 bg-white font-medium"
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition-all text-gray-700 bg-white font-medium"
                 title="Last page"
               >
                 {'>>'}
@@ -1185,49 +1189,49 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               onClick={() => applyDateFilter(currentColumnId, 'today')}
-                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 transition-all text-gray-700 bg-white font-medium"
+                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all text-gray-700 bg-white font-medium"
                             >
                               Today
                             </button>
                             <button
                               onClick={() => applyDateFilter(currentColumnId, 'yesterday')}
-                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 transition-all text-gray-700 bg-white font-medium"
+                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all text-gray-700 bg-white font-medium"
                             >
                               Yesterday
                             </button>
                             <button
                               onClick={() => applyDateFilter(currentColumnId, 'thisweek')}
-                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 transition-all text-gray-700 bg-white font-medium"
+                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all text-gray-700 bg-white font-medium"
                             >
                               This Week
                             </button>
                             <button
                               onClick={() => applyDateFilter(currentColumnId, 'lastweek')}
-                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 transition-all text-gray-700 bg-white font-medium"
+                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all text-gray-700 bg-white font-medium"
                             >
                               Last Week
                             </button>
                             <button
                               onClick={() => applyDateFilter(currentColumnId, 'thismonth')}
-                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 transition-all text-gray-700 bg-white font-medium"
+                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all text-gray-700 bg-white font-medium"
                             >
                               This Month
                             </button>
                             <button
                               onClick={() => applyDateFilter(currentColumnId, 'lastmonth')}
-                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 transition-all text-gray-700 bg-white font-medium"
+                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all text-gray-700 bg-white font-medium"
                             >
                               Last Month
                             </button>
                             <button
                               onClick={() => applyDateFilter(currentColumnId, 'thisyear')}
-                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 transition-all text-gray-700 bg-white font-medium"
+                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all text-gray-700 bg-white font-medium"
                             >
                               This Year
                             </button>
                             <button
                               onClick={() => applyDateFilter(currentColumnId, 'lastyear')}
-                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 transition-all text-gray-700 bg-white font-medium"
+                              className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 transition-all text-gray-700 bg-white font-medium"
                             >
                               Last Year
                             </button>
@@ -1242,14 +1246,14 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                               type="date"
                               value={dateRangeStart}
                               onChange={(e) => setDateRangeStart(e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition-all"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all"
                               placeholder="Start date"
                             />
                             <input
                               type="date"
                               value={dateRangeEnd}
                               onChange={(e) => setDateRangeEnd(e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition-all"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all"
                               placeholder="End date"
                             />
                             <button
@@ -1259,7 +1263,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                                 }
                               }}
                               disabled={!dateRangeStart || !dateRangeEnd}
-                              className="w-full px-3 py-2 text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed shadow-sm hover:shadow-md font-medium"
+                              className="w-full px-3 py-2 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed shadow-sm hover:shadow-md font-medium"
                             >
                               Apply Date Range
                             </button>
@@ -1286,7 +1290,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                               }
                             }}
                             placeholder="Type to search..."
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition-all"
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all"
                             autoFocus
                           />
                           <button
@@ -1300,7 +1304,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                                 setSearchTerm('')
                               }
                             }}
-                            className="mt-2 w-full px-3 py-2 text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 shadow-sm hover:shadow-md font-medium"
+                            className="mt-2 w-full px-3 py-2 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md font-medium"
                           >
                             Apply Search
                           </button>
@@ -1315,7 +1319,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                             {getUniqueColumnValues(currentColumnId).map((value, index) => (
                               <label
                                 key={index}
-                                className="flex items-center px-3 py-2 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 last:border-b-0 bg-white transition-colors"
+                                className="flex items-center px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 bg-white transition-colors"
                               >
                                 <input
                                   type="checkbox"
@@ -1335,7 +1339,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                                     applyValueFilter(currentColumnId, newFilter)
                                   }}
                                   checked={(table.getColumn(currentColumnId)?.getFilterValue() as string[] || []).includes(value)}
-                                  className="mr-2 h-4 w-4 text-emerald-500 border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 accent-emerald-500"
+                                  className="mr-2 h-4 w-4 text-blue-500 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 accent-blue-500"
                                 />
                                 <span className="text-sm text-gray-700 truncate flex-1">
                                   {value || <em className="text-gray-400">(empty)</em>}
@@ -1351,13 +1355,13 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                     <div className="mb-4 space-y-2">
                       <button
                         onClick={() => applyFilter(currentColumnId, 'empty')}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-700 transition-all text-left text-gray-700 bg-white font-medium"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-all text-left text-gray-700 bg-white font-medium"
                       >
                         Show Empty Cells
                       </button>
                       <button
                         onClick={() => applyFilter(currentColumnId, 'notEmpty')}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-700 transition-all text-left text-gray-700 bg-white font-medium"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-all text-left text-gray-700 bg-white font-medium"
                       >
                         Show Non-Empty Cells
                       </button>
@@ -1400,11 +1404,11 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
           <div className="fixed inset-0 z-[9991] flex items-center justify-center p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
               {/* Modal Header */}
-              <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-teal-50">
+              <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                       </svg>
                       File Manager
@@ -1432,7 +1436,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                     onClick={() => setActiveTab('files')}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                       activeTab === 'files'
-                        ? 'bg-white text-emerald-600 shadow-sm'
+                        ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-gray-600 hover:bg-white/50'
                     }`}
                   >
@@ -1448,7 +1452,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                       onClick={() => setActiveTab('upload')}
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'upload'
-                          ? 'bg-white text-emerald-600 shadow-sm'
+                          ? 'bg-white text-blue-600 shadow-sm'
                           : 'text-gray-600 hover:bg-white/50'
                       }`}
                     >
@@ -1471,8 +1475,8 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                     {loadingFiles ? (
                       /* Loading state */
                       <div className="text-center py-12">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-emerald-100 rounded-full flex items-center justify-center">
-                          <svg className="animate-spin w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24">
+                        <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                          <svg className="animate-spin w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
@@ -1493,7 +1497,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                             <p className="text-gray-400 text-xs mb-4">Upload your first file to get started</p>
                             <button
                               onClick={() => setActiveTab('upload')}
-                              className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm hover:shadow-md font-medium"
+                              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm hover:shadow-md font-medium"
                             >
                               Upload File
                             </button>
@@ -1505,8 +1509,8 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                     ) : (
                       /* Files list */
                       filesList.map((file) => (
-                        <div key={file.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:border-emerald-300 hover:bg-emerald-50 transition-all group">
-                          <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div key={file.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all group">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                             <img src={file.iconUrl} alt="" className="w-5 h-5" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1530,7 +1534,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                               href={file.downloadUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                               title="Download"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1575,7 +1579,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                 ) : (
                   /* Upload Tab */
                   <div>
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-emerald-400 transition-all">
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-all">
                       <input
                         type="file"
                         id="file-upload"
@@ -1589,8 +1593,8 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                         }}
                       />
                       <label htmlFor="file-upload" className="cursor-pointer">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-emerald-100 to-teal-100 rounded-full flex items-center justify-center">
-                          <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-blue-100 to-blue-200 rounded-full flex items-center justify-center">
+                          <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                           </svg>
                         </div>
@@ -1616,13 +1620,13 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                           return (
                             <div key={index} className={`p-3 border rounded-lg ${
                               hasError ? 'bg-red-50 border-red-200' : 
-                              isComplete ? 'bg-emerald-50 border-emerald-200' : 
+                              isComplete ? 'bg-blue-50 border-blue-200' : 
                               'bg-gray-50 border-gray-200'
                             }`}>
                               <div className="flex items-center gap-3 mb-2">
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                                   hasError ? 'bg-red-100' : 
-                                  isComplete ? 'bg-emerald-100' : 
+                                  isComplete ? 'bg-blue-100' : 
                                   'bg-gray-100'
                                 }`}>
                                   {hasError ? (
@@ -1630,7 +1634,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                     </svg>
                                   ) : isComplete ? (
-                                    <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                     </svg>
                                   ) : (
@@ -1642,12 +1646,12 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                                 <div className="flex-1 min-w-0">
                                   <p className={`text-sm font-medium truncate ${
                                     hasError ? 'text-red-800' : 
-                                    isComplete ? 'text-emerald-800' : 
+                                    isComplete ? 'text-blue-800' : 
                                     'text-gray-800'
                                   }`}>{file.name}</p>
                                   <p className={`text-xs ${
                                     hasError ? 'text-red-600' : 
-                                    isComplete ? 'text-emerald-600' : 
+                                    isComplete ? 'text-blue-600' : 
                                     'text-gray-600'
                                   }`}>
                                     {(file.size / 1024).toFixed(2)} KB
@@ -1676,7 +1680,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                               {progress > 0 && progress < 100 && !hasError && (
                                 <div className="w-full bg-gray-200 rounded-full h-1.5">
                                   <div 
-                                    className="bg-gradient-to-r from-emerald-500 to-teal-500 h-1.5 rounded-full transition-all duration-300"
+                                    className="bg-gradient-to-r from-blue-500 to-blue-600 h-1.5 rounded-full transition-all duration-300"
                                     style={{ width: `${progress}%` }}
                                   ></div>
                                 </div>
@@ -1688,7 +1692,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                         <button
                           onClick={handleFileUpload}
                           disabled={uploading || uploadFiles.length === 0}
-                          className="w-full px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 shadow-sm hover:shadow-md font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
+                          className="w-full px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
                         >
                           {uploading ? (
                             <>
@@ -1746,7 +1750,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                       href={previewModal.file.downloadUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                      className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                       title="Download"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1854,7 +1858,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                                   href={previewModal.file.downloadUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
+                                  className="px-4 py-2 bg-[#424eed] text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
                                 >
                                   Download File
                                 </a>
@@ -1862,7 +1866,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                                   href={previewModal.file.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                                  className="px-4 py-2 bg-[#424eed] text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
                                 >
                                   Open in Drive
                                 </a>

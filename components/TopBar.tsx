@@ -65,22 +65,35 @@ export default function TopBar({ title = 'OSDM App', profileName, onToggle }: Pr
         </div>
       </div>
 
-      <div className="relative" ref={ref}>
+      <div className="flex items-center gap-2">
+        {/* User Management Button */}
         <button 
-          onClick={() => setOpen((s) => !s)} 
-          className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-blue-50 transition-all duration-200 group"
+          onClick={() => router.push('/user-management')} 
+          className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-blue-50 transition-all duration-200 group"
+          title="User Management"
         >
-          <div className="hidden sm:flex flex-col items-end">
-            <span className="text-sm font-semibold text-gray-700">{profileName || 'Guest'}</span>
-            <span className="text-xs text-gray-500">View Profile</span>
-          </div>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-sm ring-2 ring-blue-100 group-hover:scale-105 group-hover:shadow-md transition-all duration-200" style={{ background: 'linear-gradient(to bottom right, #424eed, #5b67f7)' }}>
-            {(profileName || 'G').charAt(0).toUpperCase()}
-          </div>
-          <svg className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <svg className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
         </button>
+
+        {/* Profile Dropdown */}
+        <div className="relative" ref={ref}>
+          <button 
+            onClick={() => setOpen((s) => !s)} 
+            className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-blue-50 transition-all duration-200 group"
+          >
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-sm font-semibold text-gray-700">{profileName || 'Guest'}</span>
+              <span className="text-xs text-gray-500">View Profile</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-sm ring-2 ring-blue-100 group-hover:scale-105 group-hover:shadow-md transition-all duration-200" style={{ background: 'linear-gradient(to bottom right, #424eed, #5b67f7)' }}>
+              {(profileName || 'G').charAt(0).toUpperCase()}
+            </div>
+            <svg className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
         {open && (
           <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -121,6 +134,7 @@ export default function TopBar({ title = 'OSDM App', profileName, onToggle }: Pr
             </div>
           </div>
         )}
+        </div>
       </div>
     </header>
   )
