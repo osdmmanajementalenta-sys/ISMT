@@ -2,6 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSheetData } from '../../lib/googleSheets'
 import { verifySessionToken } from '../../lib/session'
 
+// Cache for colom_setting to avoid repeated API calls
+let colomSettingCache: any = null
+let colomSettingCacheTime = 0
+const CACHE_TTL = 60000 // 1 minute cache
+
 // Helper function to format date from various formats to DD-MMM-YYYY
 function formatDateDDMMMYYYY(dateStr: string): string {
   if (!dateStr) return ''
@@ -63,10 +68,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // if requesting a specific sheet, check permissions via page_setting
   try {
     if (sheetName) {
-      // always allow access to the page_setting, colom_setting, users, and menu sheets for landed users so the UI
-      // (landing page / sidebar / DataTable) can render permission cards, column settings, user management, and navigation menu.
+      // always allow access to the page_setting, colom_setting, users, menu, and list_dropdown sheets for landed users so the UI
+      // (landing page / sidebar / DataTable) can render permission cards, column settings, user management, navigation menu, and dropdown options.
       // Restrict other sheets according to the table.
-      if (sheetName === 'page_setting' || sheetName === 'colom_setting' || sheetName === 'users' || sheetName === 'menu') {
+      if (sheetName === 'page_setting' || sheetName === 'colom_setting' || sheetName === 'users' || sheetName === 'menu' || sheetName === 'list_dropdown') {
         const data = await getSheetData(sheetId, sheetName)
         return res.status(200).json(data)
       }
@@ -93,11 +98,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const data = await getSheetData(sheetId, sheetName)
     
+    // Debug log for subheader detection
+    if (sheetName === 'Penugasan Luar Instansi') {
+      console.log('Sheet API Response:', {
+        sheetName,
+        hasSubheaders: !!data.subheaders,
+        subheaders: data.subheaders,
+        headerMerges: data.headerMerges,
+        headersCount: data.headers.length,
+        rowsCount: data.rows.length,
+        firstRowFirstCell: data.rows[0]?.[0]
+      })
+    }
+    
     // Clean up date columns based on colom_setting
     if (sheetName && sheetName !== 'page_setting' && sheetName !== 'colom_setting') {
       try {
-        const colSettings = await getSheetData(sheetId, 'colom_setting')
+        // Use cache to avoid repeated API calls
+        const now = Date.now()
+        if (!colomSettingCache || (now - colomSettingCacheTime) > CACHE_TTL) {
+          colomSettingCache = await getSheetData(sheetId, 'colom_setting')
+          colomSettingCacheTime = now
+        }
+        const colSettings = colomSettingCache
         const dateColumns: number[] = []
+        
+        // Use subheaders if available, otherwise use headers
+        const headersToCheck = data.subheaders && data.subheaders.length > 0 ? data.subheaders : data.headers
         
         // Find which columns are date type
         for (const settingRow of colSettings.rows) {
@@ -105,9 +132,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const colType = (settingRow[1] || '').toString().trim().toLowerCase()
           
           if (colType === 'date') {
-            // Find the index of this column in the actual data
-            const colIndex = data.headers.findIndex(h => 
-              h.toString().trim().toLowerCase() === colName.toLowerCase()
+            // Find the index of this column in the actual data (check subheaders first if available)
+            const colIndex = headersToCheck.findIndex((h: any) => 
+              h && h.toString().trim().toLowerCase() === colName.toLowerCase()
             )
             if (colIndex !== -1) {
               dateColumns.push(colIndex)
@@ -135,7 +162,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     return res.status(200).json(data)
   } catch (err: any) {
-    console.error('sheet error', err)
-    return res.status(500).json({ error: err.message || 'unknown' })
+    console.error('sheet error for', sheetName, ':', err)
+    console.error('stack:', err.stack)
+    return res.status(500).json({ error: err.message || 'unknown', details: err.toString() })
   }
 }

@@ -1,159 +1,129 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { google } from 'googleapis';
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { getSheetData } from '../../lib/googleSheets'
+import { verifySessionToken } from '../../lib/session'
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+const CATEGORIES = [
+  { name: 'Pengusulan Pelaksana Tugas/Harian', sheetName: 'Pengusulan Pelaksana Tugas/Harian', namaField: 'NAMA', skField: 'NO. SURAT PLT/PLH', dateFields: ['TGL. SURAT USUL', 'TGL. SURAT PLT/PLH'] },
+  { name: 'Pengusulan Administrator & Pengawas', sheetName: 'Pengusulan Administrator dan Pengawas', namaField: 'NAMA', skField: 'NO. SK', dateFields: ['TGL. SURAT USUL', 'TGL. SK'] },
+  { name: 'Pelantikan', sheetName: 'Pelantikan', namaField: 'NAMA', skField: 'NO. SK', dateFields: ['TGL. SK'] },
+  { name: 'Penugasan Luar Instansi', sheetName: 'Penugasan Luar Instansi', namaField: 'NAMA', skField: 'NO. SK PENUGASAN', dateFields: ['TGL. SURAT', 'TGL. SK PENUGASAN'] },
+  { name: 'Pengusulan JPT', sheetName: 'Pengusulan JPT', namaField: 'NAMA', skField: 'NO. SK', dateFields: ['TGL. SURAT USUL', 'TGL. SK'] }
+]
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const sheetId = process.env.GOOGLE_SHEET_ID
+  if (!sheetId) return res.status(400).json({ error: 'GOOGLE_SHEET_ID not set' })
+
+  // Verify session
+  const token = req.cookies?.osdm_session || req.headers.cookie?.split(';').find((c) => c.trim().startsWith('osdm_session='))?.split('=')[1]
+  const payload = verifySessionToken(token)
+
+  if (!payload) return res.status(401).json({ error: 'Not authenticated' })
 
   try {
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    const result: any = {}
 
-    if (!spreadsheetId) {
-      return res.status(500).json({ error: 'Spreadsheet ID not configured' });
-    }
+    // Fetch all sheets in parallel (more efficient than sequential)
+    const fetchPromises = CATEGORIES.map(async (category) => {
+      try {
+        const data = await getSheetData(sheetId, category.sheetName)
+        const headers = data.headers || []
+        const subheaders = data.subheaders || []
+        const rows = data.rows || []
 
-    // Prepare auth
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
-      throw new Error('Missing Google service account environment variables');
-    }
+        // Debug log - tampilkan SEMUA header dan subheader
+        console.log(`\n🔍 ${category.name}:`)
+        console.log('  📋 Headers:', headers)
+        console.log('  📋 Subheaders:', subheaders)
+        console.log('  📋 Has subheaders?', subheaders.length > 0)
 
-    let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
-    privateKey = privateKey.trim();
-    if ((privateKey.startsWith('"') && privateKey.endsWith('"')) || (privateKey.startsWith("'") && privateKey.endsWith("'"))) {
-      privateKey = privateKey.slice(1, -1);
-    }
-    privateKey = privateKey.replace(/\\n/g, '\n');
+        // Use subheaders if available
+        const headersToSearch = subheaders.length > 0 ? subheaders : headers
+        console.log('  🔎 Will search in:', subheaders.length > 0 ? 'SUBHEADERS' : 'HEADERS')
 
-    const client = new google.auth.JWT(
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      undefined,
-      privateKey,
-      ['https://www.googleapis.com/auth/spreadsheets']
-    );
+        // Search NAMA in headers (biasanya di row 1)
+        let namaIndex = headers.findIndex((h: string) => h && h.toUpperCase().includes(category.namaField.toUpperCase()))
+        
+        // Search SK in subheaders first (jika ada), lalu headers
+        let skIndex = -1
+        if (subheaders.length > 0) {
+          skIndex = subheaders.findIndex((h: string) => {
+            if (!h) return false
+            const headerNormalized = h.toUpperCase().replace(/[\s.]/g, '')
+            const skFieldNormalized = category.skField.toUpperCase().replace(/[\s.]/g, '')
+            return headerNormalized.includes(skFieldNormalized)
+          })
+        }
+        
+        // Jika tidak ketemu di subheader, cari di header
+        if (skIndex === -1) {
+          skIndex = headers.findIndex((h: string) => {
+            if (!h) return false
+            const headerNormalized = h.toUpperCase().replace(/[\s.]/g, '')
+            const skFieldNormalized = category.skField.toUpperCase().replace(/[\s.]/g, '')
+            return headerNormalized.includes(skFieldNormalized)
+          })
+        }
 
-    const sheets = google.sheets({ version: 'v4', auth: client });
+        // Debug log
+        console.log('  🔍 Looking for NAMA field:', category.namaField)
+        console.log('     → Found at index:', namaIndex, 'in HEADERS')
+        if (namaIndex !== -1) console.log('     → Column name:', headers[namaIndex])
+        
+        console.log('  🔍 Looking for SK field:', category.skField)
+        console.log('     → Found at index:', skIndex, 'in', skIndex !== -1 && subheaders.length > 0 && subheaders[skIndex] ? 'SUBHEADERS' : 'HEADERS')
+        if (skIndex !== -1) {
+          const foundIn = subheaders.length > 0 && subheaders[skIndex] ? subheaders : headers
+          console.log('     → Column name:', foundIn[skIndex])
+        }
+        
+        console.log('  📊 Total rows:', rows.length)
 
-    // KUSTOMISASI: Ganti nama sheet sesuai dengan sheet Anda
-    // Contoh: jika sheet Anda bernama "Data Usul" dan "Data SK", ubah di bawah ini
-    const SHEET_NAME_USUL = 'menu'; // Ganti dengan nama sheet usul Anda
-    const SHEET_NAME_SK = 'menu';   // Ganti dengan nama sheet SK Anda
-    
-    try {
-      const response = await sheets.spreadsheets.values.batchGet({
-        spreadsheetId,
-        ranges: [`${SHEET_NAME_USUL}!A:Z`, `${SHEET_NAME_SK}!A:Z`],
-      });
+        // Calculate statistics
+        const usulanMasuk = rows.filter((row: string[]) => namaIndex !== -1 && row[namaIndex] && row[namaIndex].toString().trim() !== '').length
+        const skKeluar = rows.filter((row: string[]) => namaIndex !== -1 && row[namaIndex] && row[namaIndex].toString().trim() !== '' && skIndex !== -1 && row[skIndex] && row[skIndex].toString().trim() !== '').length
 
-      const ranges = response.data.valueRanges || [];
-      
-      // Hitung total usul (baris data - header)
-      const usulData = ranges[0]?.values || [];
-      const totalUsul = usulData.length > 1 ? usulData.length - 1 : 0;
+        console.log('  - Usulan Masuk:', usulanMasuk)
+        console.log('  - SK Keluar:', skKeluar)
 
-      // Hitung total SK
-      const skData = ranges[1]?.values || [];
-      const totalSK = skData.length > 1 ? Math.floor((skData.length - 1) * 0.8) : 0; // 80% dari usul sebagai contoh
-
-      // Hitung usul dalam proses
-      const usulProses = totalUsul - totalSK;
-
-      // Hitung data bulan ini (contoh sederhana)
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-
-      let usulBulanIni = Math.floor(totalUsul * 0.15); // 15% sebagai contoh
-      let skBulanIni = Math.floor(totalSK * 0.14); // 14% sebagai contoh
-
-      // KUSTOMISASI: Jika Anda punya kolom tanggal, uncomment dan sesuaikan kode di bawah
-      /*
-      if (usulData.length > 1) {
-        usulBulanIni = 0;
-        for (let i = 1; i < usulData.length; i++) {
-          const row = usulData[i];
-          const dateStr = row[0]; // Ganti 0 dengan index kolom tanggal Anda
-          if (dateStr) {
-            try {
-              const date = new Date(dateStr);
-              if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-                usulBulanIni++;
-              }
-            } catch (e) {
-              // Skip invalid dates
+        // Get details
+        const details = rows
+          .filter((row: string[]) => namaIndex !== -1 && row[namaIndex] && row[namaIndex].toString().trim() !== '')
+          .map((row: string[]) => {
+            const detail: any = { 
+              nama: namaIndex !== -1 ? row[namaIndex] : '', 
+              sk: skIndex !== -1 ? row[skIndex] : '' 
             }
-          }
-        }
-      }
-
-      if (skData.length > 1) {
-        skBulanIni = 0;
-        for (let i = 1; i < skData.length; i++) {
-          const row = skData[i];
-          const dateStr = row[0]; // Ganti 0 dengan index kolom tanggal Anda
-          if (dateStr) {
-            try {
-              const date = new Date(dateStr);
-              if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-                skBulanIni++;
+            // Add date fields
+            category.dateFields.forEach((dateField: string) => {
+              const idx = headersToSearch.findIndex((h: string) => h && h.toUpperCase() === dateField.toUpperCase())
+              if (idx !== -1) {
+                detail[dateField] = row[idx] || ''
               }
-            } catch (e) {
-              // Skip invalid dates
-            }
-          }
+            })
+            return detail
+          })
+
+        result[category.name] = {
+          usulanMasuk,
+          skKeluar,
+          details
+        }
+      } catch (err) {
+        console.error(`Error fetching ${category.name}:`, err)
+        result[category.name] = {
+          usulanMasuk: 0,
+          skKeluar: 0,
+          details: []
         }
       }
-      */
+    })
 
-      const dashboardData = {
-        totalUsul,
-        totalSK,
-        usulProses,
-        usulSelesai: totalSK,
-        pencapaian: totalUsul > 0 ? (totalSK / totalUsul) * 100 : 0,
-        bulanIni: {
-          usul: usulBulanIni,
-          sk: skBulanIni
-        }
-      };
+    await Promise.all(fetchPromises)
 
-      return res.status(200).json(dashboardData);
-    } catch (sheetError) {
-      // Jika terjadi error dengan sheet, return dummy data
-      console.error('Sheet error, returning dummy data:', sheetError);
-      
-      const dummyData = {
-        totalUsul: 245,
-        totalSK: 198,
-        usulProses: 47,
-        usulSelesai: 198,
-        pencapaian: 80.82,
-        bulanIni: {
-          usul: 32,
-          sk: 28
-        }
-      };
-      
-      return res.status(200).json(dummyData);
-    }
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    
-    // Fallback ke dummy data jika ada error
-    const dummyData = {
-      totalUsul: 245,
-      totalSK: 198,
-      usulProses: 47,
-      usulSelesai: 198,
-      pencapaian: 80.82,
-      bulanIni: {
-        usul: 32,
-        sk: 28
-      }
-    };
-    
-    return res.status(200).json(dummyData);
+    return res.status(200).json(result)
+  } catch (err: any) {
+    console.error('Dashboard API error:', err)
+    return res.status(500).json({ error: err.message || 'unknown', details: err.toString() })
   }
 }

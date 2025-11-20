@@ -22,11 +22,23 @@ declare module '@tanstack/react-table' {
     isEditable?: boolean
     isSticky?: boolean
     headerIndex?: number
+    hasSubheader?: boolean
+    originalHeader?: string
+    isPrioritas?: boolean
   }
+}
+
+type MergeInfo = {
+  startColumnIndex: number
+  endColumnIndex: number
+  startRowIndex: number
+  endRowIndex: number
 }
 
 type Props = {
   headers: string[]
+  subheaders?: string[]
+  headerMerges?: MergeInfo[]
   rows: string[][]
   sheetName?: string
 }
@@ -41,12 +53,17 @@ type ColumnSetting = {
   upload?: string
 }
 
-export default function DataTable({ headers, rows, sheetName }: Props) {
+type DropdownOption = {
+  [header: string]: string[]
+}
+
+export default function DataTable({ headers, subheaders, headerMerges, rows, sheetName }: Props) {
   const [data, setData] = useState<RowData[]>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>([])
   const [colSettings, setColSettings] = useState<ColumnSetting[]>([])
+  const [dropdownOptions, setDropdownOptions] = useState<DropdownOption>({})
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; columnId: string } | null>(null)
   const [filterPopup, setFilterPopup] = useState<{ columnId: string; position: { x: number; y: number } } | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -126,6 +143,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
     async function fetchSettings() {
       try {
         if (sheetName) {
+          // Fetch colom_setting
           const resp = await fetch(`/api/sheet?sheet=colom_setting`)
           if (resp.ok) {
             const j = await resp.json()
@@ -141,9 +159,33 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
             }
             setColSettings(cs)
           }
+
+          // Fetch list_dropdown
+          const dropdownResp = await fetch(`/api/sheet?sheet=list_dropdown`)
+          if (dropdownResp.ok) {
+            const dropdownData = await dropdownResp.json()
+            const dropdownHeaders = dropdownData.headers || []
+            const dropdownRows = dropdownData.rows || []
+            
+            // Build dropdown options object
+            const options: DropdownOption = {}
+            dropdownHeaders.forEach((header: string, colIndex: number) => {
+              const headerName = header.toString().trim()
+              if (headerName) {
+                // Collect all non-empty values from this column
+                const values = dropdownRows
+                  .map((row: string[]) => (row[colIndex] || '').toString().trim())
+                  .filter((val: string) => val !== '')
+                options[headerName] = values
+              }
+            })
+            
+            setDropdownOptions(options)
+            console.log('Dropdown options loaded:', options)
+          }
         }
       } catch (e) {
-        console.warn('Failed to fetch colom_setting', e)
+        console.warn('Failed to fetch settings', e)
       }
     }
     fetchSettings()
@@ -626,7 +668,16 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
 
   const columns = useMemo<ColumnDef<RowData>[]>(() => {
     return headers.map((h, i) => {
-      const setting = colSettings.find(c => c.col.toLowerCase() === h.toString().trim().toLowerCase())
+      // Check if this column has a subheader (not empty string)
+      const subheaderText = subheaders && subheaders[i] ? subheaders[i].trim() : ''
+      const hasSubheader = subheaderText !== ''
+      
+      // For columns with subheader, try to find setting by subheader name
+      // For columns without subheader, use the original header name
+      const columnNameForSetting = hasSubheader ? subheaderText : h.toString().trim()
+      
+      const setting = colSettings.find(c => c.col.toLowerCase() === columnNameForSetting.toLowerCase())
+      
       const type = setting?.type || 'text'
       const show = (setting?.show ?? 'yes').toLowerCase()
       const edit = (setting?.edit ?? 'yes').toLowerCase()
@@ -635,11 +686,17 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
       const isSticky = show === 'sticky'
       const isEditable = (edit === 'yes' || edit === 'y' || edit === 'true') && type !== 'uuid'
       const hasUpload = upload === 'yes' || upload === 'y' || upload === 'true'
+      
+      // Check if this is PRIORITAS column (checkbox type)
+      const isPrioritas = type === 'checkbox' || columnNameForSetting.toLowerCase() === 'prioritas'
+      
+      // Display text: if has subheader use it, otherwise use original header
+      const displayHeader = hasSubheader ? subheaderText : h.toString()
 
       return {
         id: `col_${i}`,
         accessorKey: `col_${i}`,
-        header: h,
+        header: displayHeader,
         enableColumnFilter: true,
         enableSorting: true,
         filterFn: customFilterFn,
@@ -649,37 +706,125 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
           isEditable,
           isSticky,
           headerIndex: i,
+          hasSubheader,
+          originalHeader: h.toString(),
+          subheaderText,
+          isPrioritas,
         },
         cell: ({ row, column, getValue }) => {
           const cellValue = getValue() as string
           const isEditing = editingCell?.rowIndex === row.original._rowIndex && editingCell?.columnId === column.id
           
           if (isEditing) {
-            return (
-              <input
-                type={type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
-                defaultValue={cellValue}
-                autoFocus
-                className="w-full px-2 py-1 border-2 border-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white shadow-sm"
-                onBlur={async (e) => {
-                  const newValue = e.target.value
-                  if (newValue !== cellValue) {
-                    await handleCellUpdate(row.original._rowIndex, column.id, newValue)
-                  }
-                  setEditingCell(null)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.currentTarget.blur()
-                  } else if (e.key === 'Escape') {
+            // Check if this column has dropdown options
+            // Try multiple ways to match: exact match, case-insensitive, or by original header
+            let options: string[] | undefined = 
+              dropdownOptions[columnNameForSetting] || 
+              dropdownOptions[h.toString().trim()] ||
+              dropdownOptions[displayHeader]
+            
+            // Try case-insensitive match if not found
+            if (!options) {
+              const dropdownKey = Object.keys(dropdownOptions).find(
+                key => key.toLowerCase() === columnNameForSetting.toLowerCase()
+              )
+              if (dropdownKey) {
+                options = dropdownOptions[dropdownKey]
+              }
+            }
+            
+            console.log('Editing cell:', { 
+              columnNameForSetting, 
+              displayHeader, 
+              originalHeader: h.toString(),
+              type,
+              hasOptions: !!options,
+              optionsCount: options?.length || 0,
+              availableDropdowns: Object.keys(dropdownOptions)
+            })
+            
+            if (type === 'dropdown' && options && options.length > 0) {
+              // Render dropdown
+              return (
+                <select
+                  defaultValue={cellValue}
+                  autoFocus
+                  className="w-full px-2 py-1 border-2 border-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white shadow-sm"
+                  onBlur={async (e) => {
+                    const newValue = e.target.value
+                    if (newValue !== cellValue) {
+                      await handleCellUpdate(row.original._rowIndex, column.id, newValue)
+                    }
                     setEditingCell(null)
-                  }
-                }}
-              />
-            )
+                  }}
+                  onChange={async (e) => {
+                    const newValue = e.target.value
+                    if (newValue !== cellValue) {
+                      await handleCellUpdate(row.original._rowIndex, column.id, newValue)
+                    }
+                    setEditingCell(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setEditingCell(null)
+                    }
+                  }}
+                >
+                  <option value="">-- Select --</option>
+                  {options.map((opt, idx) => (
+                    <option key={idx} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              )
+            } else {
+              // Render normal input
+              return (
+                <input
+                  type={type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
+                  defaultValue={cellValue}
+                  autoFocus
+                  className="w-full px-2 py-1 border-2 border-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white shadow-sm"
+                  onBlur={async (e) => {
+                    const newValue = e.target.value
+                    if (newValue !== cellValue) {
+                      await handleCellUpdate(row.original._rowIndex, column.id, newValue)
+                    }
+                    setEditingCell(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur()
+                    } else if (e.key === 'Escape') {
+                      setEditingCell(null)
+                    }
+                  }}
+                />
+              )
+            }
           }
 
           const displayValue = type === 'date' ? formatDateDDMMMYYYY(cellValue) : cellValue
+
+          // If this is a PRIORITAS/checkbox column
+          if (isPrioritas) {
+            const isChecked = cellValue === 'true' || cellValue === 'TRUE' || cellValue === 'yes' || cellValue === 'YES' || cellValue === 'y' || cellValue === '1' || cellValue === 'checked'
+            return (
+              <div className="px-2 py-1 flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={async (e) => {
+                    const newValue = e.target.checked ? 'TRUE' : 'FALSE'
+                    await handleCellUpdate(row.original._rowIndex, column.id, newValue)
+                  }}
+                  className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                  style={{ accentColor: '#424eed' }}
+                  disabled={!isEditable}
+                  title={isEditable ? 'Toggle priority' : 'Not editable'}
+                />
+              </div>
+            )
+          }
 
           // Jika kolom memiliki upload feature
           if (hasUpload && cellValue) {
@@ -733,7 +878,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
         },
       } as ColumnDef<RowData>
     }).filter(col => col.meta?.isVisible !== false)
-  }, [headers, colSettings, editingCell, data])
+  }, [headers, subheaders, colSettings, editingCell, data])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -818,8 +963,12 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
 
     setDeleting(true)
     try {
-      // Convert selected indices to actual sheet row numbers (add 2 because: +1 for 1-based indexing, +1 for header row)
-      const rowNumbers = Array.from(selectedRows).map(idx => idx + 2)
+      // Calculate header offset: +1 for main header, +1 if has subheader
+      const headerOffset = subheaders ? 2 : 1
+      
+      // Convert selected indices to actual sheet row numbers
+      // Add 1 for 1-based indexing in Google Sheets, plus header offset
+      const rowNumbers = Array.from(selectedRows).map(idx => idx + 1 + headerOffset)
       
       // Sort in descending order to delete from bottom to top (to avoid index shifting issues)
       rowNumbers.sort((a, b) => b - a)
@@ -988,28 +1137,163 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
 
       <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm flex flex-col flex-1 min-h-0">
         <div className="overflow-x-auto overflow-y-auto flex-1">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <table className="min-w-full text-sm border-collapse">
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0 z-30 border-b border-gray-200">
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id}>
-                  <th className="sticky left-0 z-40 bg-gradient-to-r from-gray-50 to-gray-100 shadow-sm border-b border-r border-gray-200 px-4 py-3.5">
-                    <input
-                      type="checkbox"
-                      checked={selectedRows.size === data.length && data.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded border-gray-300 cursor-pointer"
-                      style={{ accentColor: '#424eed' }}
-                      title="Select All"
-                    />
-                  </th>
-                  {headerGroup.headers.map(header => {
+              {/* Main Header Row */}
+              {table.getHeaderGroups().map(headerGroup => {
+                // Build merged headers structure based on Google Sheets merge info
+                const mergedHeaders: Array<{
+                  headerText: string
+                  headers: any[]
+                  startIndex: number
+                  hasSubheader: boolean
+                }> = []
+                
+                console.log('headerMerges from Google Sheets:', headerMerges)
+                
+                let skipUntilIndex = -1
+                
+                headerGroup.headers.forEach((header, idx) => {
+                  if (idx < skipUntilIndex) {
+                    // This column is part of a previous merge, skip it
+                    return
+                  }
+                  
+                  const headerIndex = header.column.columnDef.meta?.headerIndex ?? 0
+                  const originalHeader = header.column.columnDef.meta?.originalHeader || ''
+                  const subheaderText = subheaders?.[headerIndex]?.toString().trim() || ''
+                  const hasSubheader = subheaderText !== ''
+                  
+                  // Check if this column is the start of a merge in row 0
+                  const merge = headerMerges?.find(m => 
+                    m.startColumnIndex === headerIndex && m.startRowIndex === 0
+                  )
+                  
+                  if (merge) {
+                    // This is a merged cell, collect all headers in the merge range
+                    const mergedCols = []
+                    for (let i = merge.startColumnIndex; i < merge.endColumnIndex; i++) {
+                      const h = headerGroup.headers.find(h => (h.column.columnDef.meta?.headerIndex ?? 0) === i)
+                      if (h) mergedCols.push(h)
+                    }
+                    
+                    mergedHeaders.push({
+                      headerText: originalHeader,
+                      headers: mergedCols,
+                      startIndex: idx,
+                      hasSubheader: true
+                    })
+                    
+                    skipUntilIndex = idx + mergedCols.length
+                  } else {
+                    // Not merged
+                    mergedHeaders.push({
+                      headerText: originalHeader,
+                      headers: [header],
+                      startIndex: idx,
+                      hasSubheader: hasSubheader
+                    })
+                  }
+                })
+                
+                console.log('Merged headers result:', mergedHeaders.map(m => ({ 
+                  headerText: m.headerText, 
+                  colspan: m.headers.length, 
+                  hasSubheader: m.hasSubheader 
+                })))
+                
+                return (
+                  <tr key={headerGroup.id}>
+                    <th 
+                      className="sticky left-0 z-40 bg-gradient-to-r from-gray-50 to-gray-100 shadow-sm border border-gray-300 px-4 py-3.5"
+                      rowSpan={subheaders ? 2 : 1}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.size === data.length && data.length > 0}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                        style={{ accentColor: '#424eed' }}
+                        title="Select All"
+                      />
+                    </th>
+                    {mergedHeaders.map((merged, mIdx) => {
+                      const firstHeader = merged.headers[0]
+                      const isSticky = firstHeader.column.columnDef.meta?.isSticky
+                      const colspan = merged.headers.length
+                      const isMultiCol = colspan > 1
+                      
+                      return (
+                        <th
+                          key={`merged_${mIdx}`}
+                          className={`relative px-4 py-3.5 ${merged.hasSubheader ? 'text-center' : 'text-left'} text-xs font-semibold uppercase tracking-wider border border-gray-300 select-none ${
+                            merged.hasSubheader 
+                              ? 'bg-gradient-to-r from-gray-200 to-gray-300 text-gray-800' 
+                              : 'bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700'
+                          } ${
+                            isSticky ? 'sticky left-0 z-40 shadow-sm' : ''
+                          }`}
+                          colSpan={colspan > 1 ? colspan : undefined}
+                          rowSpan={!merged.hasSubheader && subheaders ? 2 : 1}
+                        >
+                          <div className={`flex items-center ${merged.hasSubheader ? 'justify-center' : 'justify-between'} gap-2`}>
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div
+                                className={`flex items-center gap-1 ${!merged.hasSubheader && firstHeader.column.getCanSort() ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                                onClick={!merged.hasSubheader ? firstHeader.column.getToggleSortingHandler() : undefined}
+                                title={!merged.hasSubheader && firstHeader.column.getCanSort() ? 'Click to sort' : ''}
+                              >
+                                <span className="truncate">{merged.headerText}</span>
+                                {!merged.hasSubheader && firstHeader.column.getIsSorted() && (
+                                  <span>
+                                    {{
+                                      asc: '🔼',
+                                      desc: '🔽',
+                                    }[firstHeader.column.getIsSorted() as string]}
+                                  </span>
+                                )}
+                              </div>
+                              {!merged.hasSubheader && firstHeader.column.getCanFilter() && !isMultiCol && (
+                                <button
+                                  onClick={(e) => handleFilterClick(firstHeader.column.id, e)}
+                                  className={`p-1 rounded-md transition-all duration-200 ${
+                                    firstHeader.column.getFilterValue() 
+                                      ? 'bg-blue-50 text-blue-600' 
+                                      : 'text-gray-400 hover:text-blue-600 hover:bg-blue-100'
+                                  }`}
+                                  title="Filter options"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+              
+              {/* Subheader Row */}
+              {subheaders && (
+                <tr>
+                  {table.getHeaderGroups()[0].headers.map(header => {
                     const hasFilter = header.column.getFilterValue()
                     const isSticky = header.column.columnDef.meta?.isSticky
+                    const headerIndex = header.column.columnDef.meta?.headerIndex ?? 0
+                    const subheaderText = subheaders[headerIndex] || ''
+                    
+                    // Skip if no subheader (already rendered with rowSpan=2)
+                    if (subheaderText.trim() === '') return null
+                    
                     return (
                       <th
-                        key={header.id}
-                        className={`relative px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200 select-none ${
-                          isSticky ? 'sticky left-0 z-40 bg-gradient-to-r from-gray-50 to-gray-100 shadow-sm border-r border-gray-200' : ''
+                        key={`sub_${header.id}`}
+                        className={`relative px-4 py-2.5 text-left text-xs font-medium text-gray-600 tracking-wide border border-gray-300 bg-gray-50 select-none ${
+                          isSticky ? 'sticky left-0 z-40 bg-gradient-to-r from-gray-50 to-gray-100 shadow-sm' : ''
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -1019,7 +1303,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                               onClick={header.column.getToggleSortingHandler()}
                               title={header.column.getCanSort() ? 'Click to sort' : ''}
                             >
-                              <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                              <span className="truncate">{subheaderText}</span>
                               {{
                                 asc: ' 🔼',
                                 desc: ' 🔽',
@@ -1042,7 +1326,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                     )
                   })}
                 </tr>
-              ))}
+              )}
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
               {table.getRowModel().rows.length === 0 ? (
@@ -1053,8 +1337,8 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                 </tr>
               ) : (
                 table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-blue-50 transition-colors duration-150 border-b border-gray-100 last:border-0">
-                    <td className="sticky left-0 bg-white z-10 shadow-sm border-b border-gray-100 px-4 py-3">
+                  <tr key={row.id} className="hover:bg-blue-50 transition-colors duration-150">
+                    <td className="sticky left-0 bg-white z-10 shadow-sm border border-gray-200 px-4 py-3">
                       <input
                         type="checkbox"
                         checked={selectedRows.has(row.index)}
@@ -1068,7 +1352,7 @@ export default function DataTable({ headers, rows, sheetName }: Props) {
                       return (
                         <td 
                           key={cell.id} 
-                          className={`text-sm text-gray-900 whitespace-nowrap border-b border-gray-100 ${
+                          className={`text-sm text-gray-900 whitespace-nowrap border border-gray-200 ${
                             isSticky ? 'sticky left-0 bg-white z-10 shadow-sm' : ''
                           }`}
                         >

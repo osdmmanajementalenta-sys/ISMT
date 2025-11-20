@@ -1,6 +1,5 @@
 import React, { ReactNode, useEffect, useState } from 'react'
 import TopBar from './TopBar'
-import SideBar from './SideBar'
 import { getStoredUser, AppUser } from '../lib/auth'
 
 type Props = {
@@ -11,7 +10,6 @@ export default function Layout({ children }: Props) {
   // avoid reading localStorage during server render to prevent hydration mismatch
   const [user, setUser] = useState<AppUser | null>(null)
   const [navItems, setNavItems] = useState<{ name: string; sheetName: string }[]>([])
-  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     setUser(getStoredUser())
@@ -64,9 +62,12 @@ export default function Layout({ children }: Props) {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
-      <TopBar title="Biro Organisasi dan Sumber Daya Manusia" profileName={user?.name || user?.user} onToggle={() => setSidebarOpen((s) => !s)} />
-      <SideBar items={navItems} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <main className="flex-1 p-6 overflow-hidden mt-topbar md:ml-sidebar">{children}</main>
+      <TopBar 
+        title="Biro Organisasi dan Sumber Daya Manusia" 
+        profileName={user?.name || user?.user} 
+        menuItems={navItems}
+      />
+      <main className="flex-1 p-6 overflow-auto mt-topbar">{children}</main>
     </div>
   )
 }

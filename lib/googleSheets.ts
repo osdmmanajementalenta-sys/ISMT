@@ -1,8 +1,17 @@
 import { google } from 'googleapis'
 
+type MergeInfo = {
+  startColumnIndex: number
+  endColumnIndex: number
+  startRowIndex: number
+  endRowIndex: number
+}
+
 type SheetResult = {
   headers: string[]
+  subheaders?: string[]
   rows: string[][]
+  headerMerges?: MergeInfo[]
 }
 
 export async function getSheetData(sheetId: string, sheetName?: string): Promise<SheetResult> {
@@ -65,10 +74,70 @@ export async function getSheetData(sheetId: string, sheetName?: string): Promise
   const resp = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: a1Range })
   const values = resp.data.values || []
 
-  const headers = values[0] || []
-  const rows = values.slice(1)
+  // Get merge information from the sheet
+  let headerMerges: MergeInfo[] = []
+  if (targetSheet?.merges) {
+    // Filter merges that are in the first row (row index 0)
+    headerMerges = targetSheet.merges
+      .filter((merge: any) => merge.startRowIndex === 0)
+      .map((merge: any) => ({
+        startColumnIndex: merge.startColumnIndex,
+        endColumnIndex: merge.endColumnIndex,
+        startRowIndex: merge.startRowIndex,
+        endRowIndex: merge.endRowIndex,
+      }))
+    
+    console.log('Header merges detected:', headerMerges)
+  }
 
-  return { headers, rows }
+  const headers = values[0] || []
+  let subheaders: string[] | undefined = undefined
+  let dataStartIndex = 1
+
+  // Detect if row 2 is a subheader row - for specific sheets
+  const sheetsWithSubheaders = [
+    'Pengusulan Administrator dan Pengawas',
+    'Pengusulan Pelaksana Tugas/Harian',
+    'Pelantikan',
+    'Penugasan Luar Instansi',
+    'Pengusulan JPT',
+    'Data Rektor'
+  ]
+  
+  // Only detect subheader if there are actual merge cells in row 0
+  // This means the sheet has grouped headers
+  if (sheetName && sheetsWithSubheaders.includes(sheetName) && values.length > 1 && headerMerges.length > 0) {
+    const secondRow = values[1] || []
+    const thirdRow = values.length > 2 ? values[2] : []
+    
+    // Check if row 2 has ANY text content (not just first cell)
+    const row2HasContent = secondRow.some((cell: any) => {
+      const text = (cell || '').toString().trim()
+      return text !== '' && isNaN(Number(text))
+    })
+    
+    console.log('Subheader detection:', { 
+      sheetName,
+      valuesLength: values.length,
+      row2Sample: secondRow.slice(0, 5),
+      row3Sample: thirdRow.slice(0, 5),
+      row2HasContent,
+      row2FullSample: secondRow.slice(0, 10)
+    })
+    
+    // If row 2 has text content (and is not numbers), it's likely a subheader
+    if (row2HasContent) {
+      subheaders = secondRow.map((cell: any) => (cell || '').toString())
+      dataStartIndex = 2
+      console.log('✓ Subheaders detected, data starts at row 3')
+    } else {
+      console.log('✗ No subheaders detected, data starts at row 2')
+    }
+  }
+
+  const rows = values.slice(dataStartIndex)
+
+  return { headers, subheaders, rows, headerMerges }
 }
 
 /**
@@ -104,7 +173,34 @@ export async function updateSheetCell(sheetId: string, sheetName: string, rowInd
   const target = sheetsMeta.find((s) => s.properties?.title === sheetName)
   if (!target) throw new Error('Sheet not found')
 
-  const headerRowCount = 1
+  // Detect if sheet has subheader (same logic as getSheetData)
+  let headerRowCount = 1
+  
+  if (sheetName === 'Penugasan Luar Instansi') {
+    // Check if row 2 exists and is subheader
+    const escapedTitle = sheetName.replace(/'/g, "''")
+    const checkRange = `'${escapedTitle}'!A1:E3`
+    const checkResp = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: checkRange })
+    const checkValues = checkResp.data.values || []
+    
+    if (checkValues.length > 2) {
+      const secondRow = checkValues[1] || []
+      const thirdRow = checkValues[2] || []
+      
+      const row2HasContent = secondRow.some((cell: any) => {
+        const text = (cell || '').toString().trim()
+        return text !== '' && isNaN(Number(text))
+      })
+      
+      const row3FirstNonEmpty = thirdRow.find((cell: any) => (cell || '').toString().trim() !== '')
+      const row3LooksLikeData = !row3FirstNonEmpty || !isNaN(Number(row3FirstNonEmpty))
+      
+      if (row2HasContent && row3LooksLikeData) {
+        headerRowCount = 2 // Has subheader
+      }
+    }
+  }
+
   const startRow = headerRowCount + 1 + rowIndex // 1-based rows in sheets
 
   // helper: col index (0 -> A)

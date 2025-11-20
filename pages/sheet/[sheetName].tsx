@@ -5,6 +5,7 @@ import { requireAuth } from '../../lib/auth'
 
 type SheetData = {
   headers: string[]
+  subheaders?: string[]
   rows: string[][]
 }
 
@@ -34,6 +35,8 @@ function SheetPage() {
         <div className="flex-1 min-h-0">
           <DataTable
             headers={data.headers}
+            subheaders={data.subheaders}
+            headerMerges={data.headerMerges}
             rows={data.rows}
             sheetName={typeof sheetName === 'string' ? sheetName : undefined}
           />
