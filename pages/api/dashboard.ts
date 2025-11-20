@@ -31,15 +31,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const subheaders = data.subheaders || []
         const rows = data.rows || []
 
-        // Debug log - tampilkan SEMUA header dan subheader
-        console.log(`\n🔍 ${category.name}:`)
-        console.log('  📋 Headers:', headers)
-        console.log('  📋 Subheaders:', subheaders)
-        console.log('  📋 Has subheaders?', subheaders.length > 0)
-
         // Use subheaders if available
         const headersToSearch = subheaders.length > 0 ? subheaders : headers
-        console.log('  🔎 Will search in:', subheaders.length > 0 ? 'SUBHEADERS' : 'HEADERS')
 
         // Search NAMA in headers (biasanya di row 1)
         let namaIndex = headers.findIndex((h: string) => h && h.toUpperCase().includes(category.namaField.toUpperCase()))
@@ -65,26 +58,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })
         }
 
-        // Debug log
-        console.log('  🔍 Looking for NAMA field:', category.namaField)
-        console.log('     → Found at index:', namaIndex, 'in HEADERS')
-        if (namaIndex !== -1) console.log('     → Column name:', headers[namaIndex])
-        
-        console.log('  🔍 Looking for SK field:', category.skField)
-        console.log('     → Found at index:', skIndex, 'in', skIndex !== -1 && subheaders.length > 0 && subheaders[skIndex] ? 'SUBHEADERS' : 'HEADERS')
-        if (skIndex !== -1) {
-          const foundIn = subheaders.length > 0 && subheaders[skIndex] ? subheaders : headers
-          console.log('     → Column name:', foundIn[skIndex])
-        }
-        
-        console.log('  📊 Total rows:', rows.length)
-
         // Calculate statistics
         const usulanMasuk = rows.filter((row: string[]) => namaIndex !== -1 && row[namaIndex] && row[namaIndex].toString().trim() !== '').length
         const skKeluar = rows.filter((row: string[]) => namaIndex !== -1 && row[namaIndex] && row[namaIndex].toString().trim() !== '' && skIndex !== -1 && row[skIndex] && row[skIndex].toString().trim() !== '').length
-
-        console.log('  - Usulan Masuk:', usulanMasuk)
-        console.log('  - SK Keluar:', skKeluar)
 
         // Get details
         const details = rows

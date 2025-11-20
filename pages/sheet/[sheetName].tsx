@@ -3,10 +3,18 @@ import { useRouter } from 'next/router'
 import DataTable from '../../components/DataTable'
 import { requireAuth } from '../../lib/auth'
 
+type MergeInfo = {
+  startColumnIndex: number
+  endColumnIndex: number
+  startRowIndex: number
+  endRowIndex: number
+}
+
 type SheetData = {
   headers: string[]
   subheaders?: string[]
   rows: string[][]
+  headerMerges?: MergeInfo[]
 }
 
 function SheetPage() {

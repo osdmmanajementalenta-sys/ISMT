@@ -59,16 +59,11 @@ function Dashboard() {
       const cacheKey = 'dashboard_cache'
       const cacheTimeKey = 'dashboard_cache_time'
       
-      // Clear cache untuk testing (hapus setelah debug selesai)
-      localStorage.removeItem(cacheKey)
-      localStorage.removeItem(cacheTimeKey)
-      
       const cached = localStorage.getItem(cacheKey)
       const cacheTime = localStorage.getItem(cacheTimeKey)
       
       // Use cache if less than 5 minutes old
       if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 300000) {
-        console.log('📦 Loading from cache...')
         setCategoryData(JSON.parse(cached))
         setLoading(false)
         return
@@ -80,19 +75,6 @@ function Dashboard() {
         
         if (resp.ok) {
           const data = await resp.json()
-          console.log('✅ Dashboard data loaded:', Object.keys(data))
-          
-          // Debug: tampilkan detail setiap kategori dari API
-          for (const categoryName in data) {
-            const catData = data[categoryName]
-            console.log(`📦 API Response for ${categoryName}:`, {
-              usulanMasuk: catData.usulanMasuk,
-              skKeluar: catData.skKeluar,
-              detailsCount: catData.details?.length || 0
-            })
-          }
-          
-          console.log('📊 Full data:', data)
           
           // Apply date filter on client side
           const filteredData: Record<string, CategoryData> = {}
@@ -140,8 +122,6 @@ function Dashboard() {
               skKeluar,
               details
             }
-            
-            console.log(`📋 ${categoryName}:`, { usulanMasuk, skKeluar, detailsCount: details.length })
           }
           
           setCategoryData(filteredData)
@@ -149,7 +129,6 @@ function Dashboard() {
           // Save to localStorage
           localStorage.setItem('dashboard_cache', JSON.stringify(data))
           localStorage.setItem('dashboard_cache_time', Date.now().toString())
-          console.log('💾 Saved to cache')
         } else {
           const errorData = await resp.json().catch(() => ({ error: 'Unknown error' }))
           console.error('Failed to fetch dashboard:', resp.status, errorData)
