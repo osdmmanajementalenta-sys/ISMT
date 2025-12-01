@@ -86,8 +86,6 @@ export async function getSheetData(sheetId: string, sheetName?: string): Promise
         startRowIndex: merge.startRowIndex,
         endRowIndex: merge.endRowIndex,
       }))
-    
-    console.log('Header merges detected:', headerMerges)
   }
 
   const headers = values[0] || []
@@ -108,7 +106,6 @@ export async function getSheetData(sheetId: string, sheetName?: string): Promise
   // This means the sheet has grouped headers
   if (sheetName && sheetsWithSubheaders.includes(sheetName) && values.length > 1 && headerMerges.length > 0) {
     const secondRow = values[1] || []
-    const thirdRow = values.length > 2 ? values[2] : []
     
     // Check if row 2 has ANY text content (not just first cell)
     const row2HasContent = secondRow.some((cell: any) => {
@@ -116,22 +113,10 @@ export async function getSheetData(sheetId: string, sheetName?: string): Promise
       return text !== '' && isNaN(Number(text))
     })
     
-    console.log('Subheader detection:', { 
-      sheetName,
-      valuesLength: values.length,
-      row2Sample: secondRow.slice(0, 5),
-      row3Sample: thirdRow.slice(0, 5),
-      row2HasContent,
-      row2FullSample: secondRow.slice(0, 10)
-    })
-    
     // If row 2 has text content (and is not numbers), it's likely a subheader
     if (row2HasContent) {
       subheaders = secondRow.map((cell: any) => (cell || '').toString())
       dataStartIndex = 2
-      console.log('✓ Subheaders detected, data starts at row 3')
-    } else {
-      console.log('✗ No subheaders detected, data starts at row 2')
     }
   }
 
@@ -176,27 +161,41 @@ export async function updateSheetCell(sheetId: string, sheetName: string, rowInd
   // Detect if sheet has subheader (same logic as getSheetData)
   let headerRowCount = 1
   
-  if (sheetName === 'Penugasan Luar Instansi') {
-    // Check if row 2 exists and is subheader
-    const escapedTitle = sheetName.replace(/'/g, "''")
-    const checkRange = `'${escapedTitle}'!A1:E3`
-    const checkResp = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: checkRange })
-    const checkValues = checkResp.data.values || []
+  // Sheets that are known to have subheaders
+  const sheetsWithSubheaders = [
+    'Pengusulan Administrator dan Pengawas',
+    'Pengusulan Pelaksaka Tugas/Harian',
+    'Pelantikan',
+    'Penugasan Luar Instansi',
+    'Pengusulan JPT',
+    'Data Rektor'
+  ]
+  
+  if (sheetsWithSubheaders.includes(sheetName)) {
+    // Check if sheet has merged cells in row 0 (indicating subheaders)
+    let hasSubheaders = false
+    if (target?.merges) {
+      hasSubheaders = target.merges.some((merge: any) => merge.startRowIndex === 0)
+    }
     
-    if (checkValues.length > 2) {
-      const secondRow = checkValues[1] || []
-      const thirdRow = checkValues[2] || []
+    if (hasSubheaders) {
+      // Check if row 2 exists and has text content
+      const escapedTitle = sheetName.replace(/'/g, "''")
+      const checkRange = `'${escapedTitle}'!A1:E3`
+      const checkResp = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: checkRange })
+      const checkValues = checkResp.data.values || []
       
-      const row2HasContent = secondRow.some((cell: any) => {
-        const text = (cell || '').toString().trim()
-        return text !== '' && isNaN(Number(text))
-      })
-      
-      const row3FirstNonEmpty = thirdRow.find((cell: any) => (cell || '').toString().trim() !== '')
-      const row3LooksLikeData = !row3FirstNonEmpty || !isNaN(Number(row3FirstNonEmpty))
-      
-      if (row2HasContent && row3LooksLikeData) {
-        headerRowCount = 2 // Has subheader
+      if (checkValues.length > 1) {
+        const secondRow = checkValues[1] || []
+        
+        const row2HasContent = secondRow.some((cell: any) => {
+          const text = (cell || '').toString().trim()
+          return text !== '' && isNaN(Number(text))
+        })
+        
+        if (row2HasContent) {
+          headerRowCount = 2 // Has subheader
+        }
       }
     }
   }
@@ -250,16 +249,66 @@ export async function appendSheetRow(sheetId: string, sheetName: string, values:
 
   const sheets = google.sheets({ version: 'v4', auth: client })
 
-  const escapedTitle = sheetName.replace(/'/g, "''")
-  const range = `'${escapedTitle}'!A1`
+  // Get sheet metadata to detect subheaders
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId })
+  const sheetsMeta = meta?.data?.sheets || []
+  const targetSheet = sheetsMeta.find((s) => s.properties?.title === sheetName)
+  
+  // Check if sheet has merged cells in row 0 (indicating subheaders)
+  let hasSubheaders = false
+  if (targetSheet?.merges) {
+    hasSubheaders = targetSheet.merges.some((merge: any) => merge.startRowIndex === 0)
+  }
 
-  await sheets.spreadsheets.values.append({
+  // Sheets that are known to have subheaders
+  const sheetsWithSubheaders = [
+    'Pengusulan Administrator dan Pengawas',
+    'Pengusulan Pelaksana Tugas/Harian',
+    'Pelantikan',
+    'Penugasan Luar Instansi',
+    'Pengusulan JPT',
+    'Data Rektor'
+  ]
+
+  // Determine starting row: if has subheaders, row 3 (index 2), otherwise row 2 (index 1)
+  const insertRowIndex = (hasSubheaders && sheetsWithSubheaders.includes(sheetName)) ? 2 : 1
+  
+  const escapedTitle = sheetName.replace(/'/g, "''")
+  
+  // Get sheet ID for the target sheet
+  const sheetIdNum = targetSheet?.properties?.sheetId
+  if (sheetIdNum === undefined) {
+    throw new Error(`Sheet ${sheetName} not found`)
+  }
+
+  // Insert a new row at the top (after headers)
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: sheetId,
+    requestBody: {
+      requests: [
+        {
+          insertDimension: {
+            range: {
+              sheetId: sheetIdNum,
+              dimension: 'ROWS',
+              startIndex: insertRowIndex,
+              endIndex: insertRowIndex + 1
+            },
+            inheritFromBefore: false
+          }
+        }
+      ]
+    }
+  })
+
+  // Write data to the newly inserted row
+  const range = `'${escapedTitle}'!A${insertRowIndex + 1}`
+  await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
     range,
     valueInputOption: 'RAW',
-    insertDataOption: 'INSERT_ROWS',
     requestBody: {
-      values: [values],
-    },
+      values: [values]
+    }
   })
 }

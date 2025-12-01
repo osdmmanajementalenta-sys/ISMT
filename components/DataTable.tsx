@@ -911,7 +911,7 @@ export default function DataTable({ headers, subheaders, headerMerges, rows, she
     getPaginationRowModel: getPaginationRowModel(),
     initialState: {
       pagination: {
-        pageSize: 10,
+        pageSize: 50,
       },
     },
   })
@@ -1149,8 +1149,6 @@ export default function DataTable({ headers, subheaders, headerMerges, rows, she
                   hasSubheader: boolean
                 }> = []
                 
-                console.log('headerMerges from Google Sheets:', headerMerges)
-                
                 let skipUntilIndex = -1
                 
                 headerGroup.headers.forEach((header, idx) => {
@@ -1172,16 +1170,23 @@ export default function DataTable({ headers, subheaders, headerMerges, rows, she
                   if (merge) {
                     // This is a merged cell, collect all headers in the merge range
                     const mergedCols = []
+                    let mergeHasAnySubheader = false
+                    
                     for (let i = merge.startColumnIndex; i < merge.endColumnIndex; i++) {
                       const h = headerGroup.headers.find(h => (h.column.columnDef.meta?.headerIndex ?? 0) === i)
-                      if (h) mergedCols.push(h)
+                      if (h) {
+                        mergedCols.push(h)
+                        // Check if any column in the merge has a subheader
+                        const subhdr = subheaders?.[i]?.toString().trim() || ''
+                        if (subhdr !== '') mergeHasAnySubheader = true
+                      }
                     }
                     
                     mergedHeaders.push({
                       headerText: originalHeader,
                       headers: mergedCols,
                       startIndex: idx,
-                      hasSubheader: true
+                      hasSubheader: mergeHasAnySubheader
                     })
                     
                     skipUntilIndex = idx + mergedCols.length
@@ -1195,12 +1200,6 @@ export default function DataTable({ headers, subheaders, headerMerges, rows, she
                     })
                   }
                 })
-                
-                console.log('Merged headers result:', mergedHeaders.map(m => ({ 
-                  headerText: m.headerText, 
-                  colspan: m.headers.length, 
-                  hasSubheader: m.hasSubheader 
-                })))
                 
                 return (
                   <tr key={headerGroup.id}>
@@ -1284,10 +1283,21 @@ export default function DataTable({ headers, subheaders, headerMerges, rows, she
                     const hasFilter = header.column.getFilterValue()
                     const isSticky = header.column.columnDef.meta?.isSticky
                     const headerIndex = header.column.columnDef.meta?.headerIndex ?? 0
-                    const subheaderText = subheaders[headerIndex] || ''
+                    const originalHeader = header.column.columnDef.meta?.originalHeader || ''
+                    const subheaderText = subheaders[headerIndex]?.toString().trim() || ''
                     
-                    // Skip if no subheader (already rendered with rowSpan=2)
-                    if (subheaderText.trim() === '') return null
+                    // Check if this column's parent header is merged
+                    const merge = headerMerges?.find(m => 
+                      headerIndex >= m.startColumnIndex && 
+                      headerIndex < m.endColumnIndex && 
+                      m.startRowIndex === 0
+                    )
+                    
+                    // If parent is merged but no subheader, skip (already handled with rowSpan=2)
+                    if (merge && subheaderText === '') return null
+                    
+                    // If no merge and no subheader, skip (already handled with rowSpan=2)
+                    if (!merge && subheaderText === '') return null
                     
                     return (
                       <th

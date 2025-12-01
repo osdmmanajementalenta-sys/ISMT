@@ -37,6 +37,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [retryCount, setRetryCount] = useState(0)
   const [quotaError, setQuotaError] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
   const parseDate = (dateStr: string): Date | null => {
     if (!dateStr) return null
@@ -62,9 +63,11 @@ function Dashboard() {
       const cached = localStorage.getItem(cacheKey)
       const cacheTime = localStorage.getItem(cacheTimeKey)
       
-      // Use cache if less than 5 minutes old
-      if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 300000) {
+      // Use cache if less than 1 minute old (for more real-time updates)
+      if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
         setCategoryData(JSON.parse(cached))
+        const cacheDate = new Date(parseInt(cacheTime))
+        setLastRefresh(cacheDate)
         setLoading(false)
         return
       }
@@ -127,8 +130,10 @@ function Dashboard() {
           setCategoryData(filteredData)
           
           // Save to localStorage
+          const now = Date.now()
           localStorage.setItem('dashboard_cache', JSON.stringify(data))
-          localStorage.setItem('dashboard_cache_time', Date.now().toString())
+          localStorage.setItem('dashboard_cache_time', now.toString())
+          setLastRefresh(new Date(now))
         } else {
           const errorData = await resp.json().catch(() => ({ error: 'Unknown error' }))
           console.error('Failed to fetch dashboard:', resp.status, errorData)
@@ -154,6 +159,13 @@ function Dashboard() {
 
     fetchAllData()
   }, [dateStart, dateEnd, retryCount])
+
+  const handleManualRefresh = () => {
+    // Clear cache to force refresh
+    localStorage.removeItem('dashboard_cache')
+    localStorage.removeItem('dashboard_cache_time')
+    setRetryCount(prev => prev + 1)
+  }
 
   const pieData = {
     labels: CATEGORIES.map(c => c.name),
@@ -207,7 +219,27 @@ function Dashboard() {
         )}
 
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">📅 Filter Rentang Tanggal</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">📅 Filter Rentang Tanggal</h3>
+            <div className="flex items-center gap-3">
+              {lastRefresh && (
+                <span className="text-xs text-gray-500">
+                  Last updated: {lastRefresh.toLocaleTimeString('id-ID')}
+                </span>
+              )}
+              <button
+                onClick={handleManualRefresh}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh data dari Google Sheets"
+              >
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {loading ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Tanggal Mulai</label>
